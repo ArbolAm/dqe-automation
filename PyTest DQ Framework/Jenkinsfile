@@ -6,12 +6,6 @@ pipeline {
 		disableConcurrentBuilds()
 	}
 
-	environment {
-		DB_HOST = 'postgres'
-		DB_PORT = '5432'
-		DB_NAME = 'mydatabase'
-	}
-
 	stages {
 		stage('Update packages') {
 			steps {
@@ -46,24 +40,24 @@ pipeline {
 			steps {
 				dir('PyTest DQ Framework') {
 					catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE', catchInterruptions: false) {
-						withCredentials([usernamePassword(
-							credentialsId: 'POSTGRES_SECRET',
-							usernameVariable: 'DB_USER',
-							passwordVariable: 'DB_PASSWORD'
-						)]) {
-							sh '''
-								. .venv/bin/activate
-								mkdir -p html_report
-								set +x
-								python -m pytest tests -m "parquet_data" \\
-									--db_host="$DB_HOST" \\
-									--db_port="$DB_PORT" \\
-									--db_name="$DB_NAME" \\
-									--db_user="$DB_USER" \\
-									--db_password="$DB_PASSWORD" \\
-									--html=html_report/report.html
-							'''
-						}
+						sh '''
+							. .venv/bin/activate
+							export PYTHONPATH="$WORKSPACE${PYTHONPATH:+:$PYTHONPATH}"
+							mkdir -p html_report
+							set +x
+							DB_HOST=$(python -c 'from data_dev.config import postgres_config; print(postgres_config.host)')
+							DB_PORT=$(python -c 'from data_dev.config import postgres_config; print(postgres_config.port)')
+							DB_NAME=$(python -c 'from data_dev.config import postgres_config; print(postgres_config.db)')
+							DB_USER=$(python -c 'from data_dev.config import postgres_config; print(postgres_config.user)')
+							DB_PASSWORD=$(python -c 'from data_dev.config import postgres_config; print(postgres_config.password)')
+							python -m pytest tests -m "parquet_data" \\
+								--db_host="$DB_HOST" \\
+								--db_port="$DB_PORT" \\
+								--db_name="$DB_NAME" \\
+								--db_user="$DB_USER" \\
+								--db_password="$DB_PASSWORD" \\
+								--html=html_report/report.html
+						'''
 					}
 				}
 			}
@@ -74,15 +68,6 @@ pipeline {
 		always {
 			dir('PyTest DQ Framework') {
 				archiveArtifacts artifacts: 'html_report/**', allowEmptyArchive: true
-				publishHTML(target: [
-					allowMissing: true,
-					alwaysLinkToLastBuild: true,
-					keepAll: true,
-					reportDir: 'html_report',
-					reportFiles: 'report.html',
-					reportName: 'Parquet DQ Report',
-					reportTitles: 'Parquet DQ Results'
-				])
 			}
 		}
 	}
