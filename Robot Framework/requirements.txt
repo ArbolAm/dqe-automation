@@ -2,4 +2,5 @@ robotframework
 robotframework-seleniumlibrary
 pandas
 pyarrow
+lxml
 selenium
