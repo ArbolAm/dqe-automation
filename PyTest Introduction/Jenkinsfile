@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    options {
+        skipDefaultCheckout(true)
+        timestamps()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                dir('PyTest Introduction') {
+                    sh '''
+                        python3 -m venv .venv
+                        .venv/bin/python -m pip install --upgrade pip
+                        .venv/bin/python -m pip install pytest pytest-html pytest-reportportal pandas
+                    '''
+                }
+            }
+        }
+
+        stage('Run tests') {
+            steps {
+                dir('PyTest Introduction') {
+                    withCredentials([string(credentialsId: 'reportportal-api-key', variable: 'RP_API_KEY')]) {
+                        sh '''
+                            .venv/bin/python -m pytest tests/ --reportportal --rp-api-key "$RP_API_KEY"
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            dir('PyTest Introduction') {
+                archiveArtifacts artifacts: 'report.html', allowEmptyArchive: true
+            }
+        }
+    }
+}

@@ -1,8 +1,17 @@
 import pytest
 import pandas as pd
 from pathlib import Path
+from datetime import datetime
 
 FILE_PATH = "src/data/data.csv"
+
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_sessionstart(session):
+    service = getattr(session.config, "py_test_service", None)
+    if service is not None:
+        service._config.rp_launch = datetime.now().strftime("my_launch_%Y%m%d_%H%M%S")
+    yield
 
 
 # Fixture to read the CSV file
